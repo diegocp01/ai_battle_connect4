@@ -1,6 +1,6 @@
 # Overview
 
-This is a Battleship game where GPT 5.1 Low plays against Claude Sonnet 4.5.
+This is a Connect 4 game where GPT 5.1 Low plays against Claude Sonnet 4.5.
 
 ![Connect 4 Demo](static/img/image.png)
 
