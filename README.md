@@ -2,7 +2,7 @@
 
 This is a Connect 4 game where GPT 5.1 Low plays against Claude Sonnet 4.5.
 
-![Connect 4 Demo](static/img/image.png)
+![Connect 4 Demo](static/img/image.png?v=2)
 
 **IMPORTANT:** You need to have an OpenAI and Anthropic API key to run this script.
 
