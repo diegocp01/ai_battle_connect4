@@ -2,7 +2,7 @@
 
 This is a Battleship game where GPT 5.1 Low plays against Claude Sonnet 4.5.
 
-![Battleship Demo](static/img/image.png)
+![Connect 4 Demo](static/img/image.png)
 
 **IMPORTANT:** You need to have an OpenAI and Anthropic API key to run this script.
 
