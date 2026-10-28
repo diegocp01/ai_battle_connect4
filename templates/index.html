@@ -1,204 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connect 4: GPT vs Claude</title>
+    <meta name="theme-color" content="#ffffff">
+    <meta name="description" content="Configure two AI players and watch a Connect 4 match.">
+    <title>AI Connect 4</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23161a3d'/%3E%3Cg fill='%23ffffff' fill-opacity='.18'%3E%3Ccircle cx='17' cy='17' r='6'/%3E%3Ccircle cx='32' cy='17' r='6'/%3E%3Ccircle cx='47' cy='17' r='6'/%3E%3Ccircle cx='47' cy='32' r='6'/%3E%3C/g%3E%3Cg fill='%23ff453a'%3E%3Ccircle cx='17' cy='32' r='6'/%3E%3Ccircle cx='32' cy='47' r='6'/%3E%3C/g%3E%3Cg fill='%23ffd60a'%3E%3Ccircle cx='32' cy='32' r='6'/%3E%3Ccircle cx='17' cy='47' r='6'/%3E%3Ccircle cx='47' cy='47' r='6'/%3E%3C/g%3E%3C/svg%3E">
     <link rel="stylesheet" href="/static/css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="/static/js/game.js" defer></script>
+    <script type="importmap">{"imports": {"three": "/static/vendor/three/three.module.js"}}</script>
+    <script type="module" src="/static/js/board3d.js"></script>
 </head>
-
 <body>
-    <!-- Decorative background elements -->
-    <div class="bg-orb bg-orb-1"></div>
-    <div class="bg-orb bg-orb-2"></div>
-    <div class="bg-orb bg-orb-3"></div>
-
-    <!-- Modal for selecting number of games and models -->
-    <div id="modal-overlay" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-glow"></div>
-            <div class="modal-icon">🔴🟡</div>
-            <h2>Connect 4 Arena</h2>
-            <p>GPT vs Claude</p>
-
-            <label for="game-count">How many games to play?</label>
-            <select id="game-count">
-                <option value="1">1 Game</option>
-                <option value="2">2 Games</option>
-                <option value="3" selected>3 Games</option>
-                <option value="4">4 Games</option>
-                <option value="5">5 Games</option>
-            </select>
-
-            <label for="gpt-model">Red Player (GPT) Model</label>
-            <select id="gpt-model">
-                <option value="gpt-5-mini">GPT 5 Mini</option>
-                <option value="gpt-5.1-low">GPT 5.1 Low</option>
-                <option value="gpt-5.1" selected>GPT 5.1 Medium</option>
-                <option value="gpt-5.2">GPT 5.2 Medium</option>
-            </select>
-
-            <label for="claude-model">Yellow Player (Claude) Model</label>
-            <select id="claude-model">
-                <option value="claude-haiku-4.5-standard">Claude Haiku 4.5</option>
-                <option value="claude-haiku-4.5" selected>Claude Haiku 4.5 Thinking</option>
-                <option value="claude-sonnet-4.5-standard">Claude Sonnet 4.5</option>
-                <option value="claude-sonnet-4.5">Claude Sonnet 4.5 Thinking</option>
-            </select>
-
-            <button id="btn-run" class="btn-run">🎮 Start Game</button>
-        </div>
-    </div>
-
-    <!-- Main game area -->
-    <div id="game-container" class="game-container hidden">
-        <div class="game-header">
-            <h1>Game <span id="game-number">1</span> of <span id="total-games">3</span></h1>
-            <div id="phase-indicator" class="phase-indicator">Starting...</div>
-        </div>
-
-        <div class="game-area">
-            <!-- GPT Panel (Left) -->
-            <div class="model-panel gpt-panel">
-                <div class="model-header">
-                    <img src="/static/img/openai.webp" alt="OpenAI" class="model-icon">
+    <a class="skip-link" href="#setup">Skip to setup</a>
+    <main class="shell">
+        <div id="error-message" class="error-banner hidden" role="alert"></div>
+        <section id="setup" class="setup" aria-labelledby="setup-title">
+            <form id="setup-form" class="setup-card">
+                <div class="setup-title-row"><div class="setup-heading"><span class="app-icon" aria-hidden="true"><svg viewBox="0 0 64 64"><defs><filter id="icon-neon" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.4" result="glow"/><feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g class="icon-slot"><circle cx="17" cy="17" r="6"/><circle cx="32" cy="17" r="6"/><circle cx="47" cy="17" r="6"/><circle cx="47" cy="32" r="6"/></g><path class="icon-win" d="M17 47 47 17"/><g class="icon-red" filter="url(#icon-neon)"><circle cx="17" cy="32" r="5.4"/><circle cx="32" cy="47" r="5.4"/></g><g class="icon-yellow" filter="url(#icon-neon)"><circle cx="32" cy="32" r="5.4"/><circle cx="17" cy="47" r="5.4"/><circle cx="47" cy="47" r="5.4"/></g></svg></span><div><p class="setup-eyebrow">AI Connect 4</p><h1 id="setup-title" tabindex="-1">New match</h1></div></div><span id="test-badge" class="test-badge hidden">Test · no LLM calls</span></div>
+                <div class="setup-connection"><label for="play-mode">Connection</label><select id="play-mode" aria-describedby="mode-description"><option value="local">Local CLIs</option><option value="api">API keys</option><option value="test">Test</option></select><p id="mode-description">Signed-in CLIs</p></div>
+                <div class="player-picks">
+                    <fieldset class="player-pick gpt-pick"><legend>OpenAI / GPT</legend><label for="gpt-model">Model</label><select id="gpt-model" disabled><option value="default">Loading…</option></select><p id="gpt-model-note" class="model-note hidden"></p>
+                        <div class="effort-control"><div class="effort-heading"><label for="gpt-effort">Reasoning effort</label><output id="gpt-effort-value" for="gpt-effort">Default</output></div><input id="gpt-effort" type="range" min="0" max="0" step="1" value="0" aria-label="GPT reasoning effort" aria-valuetext="Default" disabled><div id="gpt-effort-ticks" class="effort-ticks" aria-hidden="true"></div><div class="effort-limits" aria-hidden="true"><span>Default</span><span id="gpt-effort-max"></span></div></div><p class="piece-note"><span class="disc-chip R" aria-hidden="true"></span>Plays red</p></fieldset>
+                    <span class="versus" aria-hidden="true">vs</span>
+                    <fieldset class="player-pick claude-pick"><legend>Anthropic / Claude</legend><label for="claude-model">Model</label><select id="claude-model" disabled><option value="default">Loading…</option></select><p id="claude-model-note" class="model-note hidden"></p>
+                        <div class="effort-control"><div class="effort-heading"><label for="claude-effort">Reasoning effort</label><output id="claude-effort-value" for="claude-effort">Default</output></div><input id="claude-effort" type="range" min="0" max="0" step="1" value="0" aria-label="Claude reasoning effort" aria-valuetext="Default" disabled><div id="claude-effort-ticks" class="effort-ticks" aria-hidden="true"></div><div class="effort-limits" aria-hidden="true"><span>Default</span><span id="claude-effort-max"></span></div></div><p class="piece-note"><span class="disc-chip Y" aria-hidden="true"></span>Plays yellow</p></fieldset>
+                </div>
+                <div class="rounds-pick"><label for="game-count">Rounds</label><select id="game-count">{% for count in range(1, 11) %}<option value="{{ count }}" {% if count == 3 %}selected{% endif %}>{{ count }}</option>{% endfor %}</select></div>
+                <button id="btn-run" class="button primary start-button" type="submit" disabled><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M5 3.5 12 8l-7 4.5z" fill="currentColor"/></svg><span>Start match</span></button>
+            </form>
+            <section class="universal-stats" aria-labelledby="universal-title">
+                <div class="universal-heading"><h2 id="universal-title">Universal stats</h2><span id="universal-meta" class="universal-meta">0 matches · 0 rounds</span></div>
+                <div class="universal-tally">
+                    <div class="universal-side"><span class="pip" data-result="gpt"></span><span><b data-match-total="gpt">0</b><small>GPT matches won</small></span></div>
+                    <div class="universal-draws"><b data-match-total="tie">0</b><small>Tied matches</small></div>
+                    <div class="universal-side claude-total"><span><b data-match-total="claude">0</b><small>Claude matches won</small></span><span class="pip" data-result="claude"></span></div>
+                </div>
+                <p id="universal-rounds" class="universal-rounds">Rounds · GPT 0 · Draws 0 · Claude 0</p>
+                <ol id="universal-matches" class="universal-matches hidden" aria-label="Every saved match, newest first"></ol>
+            </section>
+        </section>
+        <div id="match-view" class="match-view hidden">
+            <section id="arena" class="arena" aria-label="AI match arena" tabindex="-1">
+                {% macro score_side(model, name, piece) %}
+                <div class="score-side {{ model }}-side">
+                    <span class="avatar"><svg class="crown" viewBox="-1 -1 34 26" aria-hidden="true"><defs><linearGradient id="{{ model }}-crown-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe680"/><stop offset=".55" stop-color="#f5b82e"/><stop offset="1" stop-color="#c98a0c"/></linearGradient></defs><g fill="url(#{{ model }}-crown-gold)" stroke="#a8730a" stroke-width="1" stroke-linejoin="round"><path d="M3.5 19 2 7.5l7.5 5.5L16 3.5l6.5 9.5L30 7.5 28.5 19Z"/><rect x="3" y="18.5" width="26" height="4.5" rx="1.5"/><circle cx="2" cy="6.5" r="1.9"/><circle cx="16" cy="2.6" r="2.1"/><circle cx="30" cy="6.5" r="1.9"/></g><circle cx="16" cy="20.75" r="1.5" fill="#d61f29"/><circle cx="9" cy="20.75" r="1.2" fill="#0071e3"/><circle cx="23" cy="20.75" r="1.2" fill="#0071e3"/><path d="M6 17.5 5.2 10.5" stroke="#fff6cc" stroke-width="1.2" stroke-linecap="round" opacity=".8"/></svg><img class="mascot" src="/static/img/mascot-{{ 'codex' if model == 'gpt' else 'claude' }}.png" alt=""><span class="mark disc-chip {{ piece }}" aria-label="Plays {{ 'red' if piece == 'R' else 'yellow' }}"></span></span>
+                    <div class="player-copy"><h2 id="{{ model }}-name">{{ name }}</h2><div class="player-activity"><span id="{{ model }}-idle">Waiting to begin</span><span id="{{ model }}-thinking" class="thinking-bubble hidden"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span>Thinking<span id="{{ model }}-timer" class="timer">0.0s</span></span></div></div>
+                    <b id="{{ model }}-score" class="score-value" aria-label="{{ name }} rounds won">0</b>
+                </div>
+                {% endmacro %}
+                <div class="arena-toolbar scoreboard" role="group" aria-label="Players and score by round">
+                    {{ score_side('gpt', 'GPT', 'R') }}
+                    <div class="score-center"><span id="game-counter" class="game-counter">Round <b id="game-number">1</b> of <b id="total-games">3</b></span><span id="round-pips" class="round-pips"></span></div>
+                    {{ score_side('claude', 'Claude', 'Y') }}
+                </div>
+                {% macro player_panel(model, name, piece) %}
+                <aside class="model-panel {{ model }}-panel" id="{{ model }}-panel" aria-labelledby="{{ model }}-name">
                     <div class="model-info">
-                        <h2 id="gpt-model-name">GPT 5.1 Medium</h2>
-                        <span class="piece-indicator piece-red">🔴 Red</span>
+                        <div class="player-metadata"><span id="{{ model }}-provider">{{ 'OpenAI' if model == 'gpt' else 'Anthropic' }}</span><span id="{{ model }}-mode"></span></div>
+                        <dl class="model-settings"><div><dt>Reasoning effort</dt><dd id="{{ model }}-effort-detail">Default</dd></div><div><dt>Pieces</dt><dd><span class="disc-chip {{ piece }}" aria-hidden="true"></span>{{ 'Red' if piece == 'R' else 'Yellow' }}</dd></div><div><dt>Last move</dt><dd id="{{ model }}-last-move">—</dd></div></dl>
+                        <section class="reasoning-box" aria-label="Latest move explanation"><h3>Latest explanation</h3><div id="{{ model }}-reasoning" class="reasoning-text">No moves yet.</div></section>
+                        <details class="player-more"><summary>Statistics &amp; timing</summary>
+                            <div id="{{ model }}-stats" class="stats-box" aria-label="{{ name }} results"><div><span id="{{ model }}-wins" class="stat-value">0</span><span class="stat-label">Wins</span></div><div><span id="{{ model }}-draws" class="stat-value">0</span><span class="stat-label">Draws</span></div><div><span id="{{ model }}-losses" class="stat-value">0</span><span class="stat-label">Losses</span></div></div>
+                            <dl class="timing-info"><div><dt>Move time</dt><dd id="{{ model }}-last-time">—</dd></div><div><dt>Game time</dt><dd id="{{ model }}-total-time">—</dd></div></dl>
+                            {% if model == 'gpt' %}<div class="series-details"><span class="session-heading"><span id="session-indicator" class="status-dot"></span><span id="session-title">Ready</span></span><span id="series-progress-text"></span><progress id="series-progress" value="0" max="3" aria-label="Series progress"></progress></div><p class="match-rules">GPT always plays red and Claude always plays yellow. Who moves first is random each round.</p>{% endif %}
+                        </details>
                     </div>
-                </div>
-                <div id="gpt-thinking" class="thinking-bubble hidden">
-                    <span class="dot"></span>
-                    <span class="dot"></span>
-                    <span class="dot"></span>
-                    <span>Thinking...</span>
-                    <span id="gpt-timer" class="timer">0.0s</span>
-                </div>
-                <div class="timing-info">
-                    <div class="time-stat">
-                        <span class="time-label">Last move:</span>
-                        <span id="gpt-last-time" class="time-value">0.0s</span>
+                </aside>
+                {% endmacro %}
+                <div class="arena-layout">
+                    {{ player_panel('gpt', 'GPT', 'R') }}
+                    <div class="board-container">
+                        <div class="board-wrapper">
+                            <div class="board-labels-top" aria-hidden="true">{% for col in range(1, 8) %}<span>{{ col }}</span>{% endfor %}</div>
+                            <div id="board-stage" class="board-stage">
+                                <div class="board-frame" aria-hidden="true"></div>
+                                <div id="board" class="board" role="group" aria-label="Connect 4 board. Waiting for match.">
+                                    {% for row in range(6) %}{% for col in range(7) %}<div class="cell" role="img" data-row="{{ row }}" data-col="{{ col }}" aria-label="Column {{ col + 1 }}, row {{ 6 - row }}: empty"></div>{% endfor %}{% endfor %}
+                                </div>
+                                <svg id="winning-line" class="winning-line" viewBox="0 0 700 600" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="0" x2="0" y2="0" pathLength="1"/></svg>
+                            </div>
+                        </div>
+                        <div class="board-status"><div id="game-status" role="status" aria-live="polite">Starting match…</div><p id="status-detail"></p></div>
+                        <div class="match-controls"><button id="btn-pause" class="button secondary hidden" type="button">Pause</button><button id="btn-resume" class="button primary hidden" type="button">Resume match</button><button id="btn-new" class="button secondary" type="button">New match</button></div>
                     </div>
-                    <div class="time-stat">
-                        <span class="time-label">Total time:</span>
-                        <span id="gpt-total-time" class="time-value">0.0s</span>
-                    </div>
+                    {{ player_panel('claude', 'Claude', 'Y') }}
                 </div>
-                <div class="stats-box">
-                    <div class="stat">
-                        <span class="stat-value" id="gpt-wins">0</span>
-                        <span class="stat-label">Wins</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value" id="gpt-losses">0</span>
-                        <span class="stat-label">Losses</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value" id="gpt-draws">0</span>
-                        <span class="stat-label">Draws</span>
-                    </div>
-                </div>
-                <div class="last-move-box">
-                    <span class="last-move-label">Last Move:</span>
-                    <span id="gpt-last-move" class="last-move-value">—</span>
-                </div>
-                <div class="reasoning-box">
-                    <h3>💭 Reasoning</h3>
-                    <div id="gpt-reasoning" class="reasoning-text">Waiting for move...</div>
-                </div>
-            </div>
-
-            <!-- Connect 4 Board (Center) -->
-            <div class="board-container">
-                <div class="column-indicators">
-                    <span class="col-num">1</span>
-                    <span class="col-num">2</span>
-                    <span class="col-num">3</span>
-                    <span class="col-num">4</span>
-                    <span class="col-num">5</span>
-                    <span class="col-num">6</span>
-                    <span class="col-num">7</span>
-                </div>
-                <div id="connect4-board" class="connect4-board">
-                    <!-- Board cells will be generated by JavaScript -->
-                </div>
-                <div id="game-status" class="game-status">Ready to start!</div>
-            </div>
-
-            <!-- Claude Panel (Right) -->
-            <div class="model-panel claude-panel">
-                <div class="model-header">
-                    <img src="/static/img/anthropic.jpeg" alt="Anthropic" class="model-icon">
-                    <div class="model-info">
-                        <h2 id="claude-model-name">Claude Haiku 4.5 Thinking</h2>
-                        <span class="piece-indicator piece-yellow">🟡 Yellow</span>
-                    </div>
-                </div>
-                <div id="claude-thinking" class="thinking-bubble hidden">
-                    <span class="dot"></span>
-                    <span class="dot"></span>
-                    <span class="dot"></span>
-                    <span>Thinking...</span>
-                    <span id="claude-timer" class="timer">0.0s</span>
-                </div>
-                <div class="timing-info">
-                    <div class="time-stat">
-                        <span class="time-label">Last move:</span>
-                        <span id="claude-last-time" class="time-value">0.0s</span>
-                    </div>
-                    <div class="time-stat">
-                        <span class="time-label">Total time:</span>
-                        <span id="claude-total-time" class="time-value">0.0s</span>
-                    </div>
-                </div>
-                <div class="stats-box">
-                    <div class="stat">
-                        <span class="stat-value" id="claude-wins">0</span>
-                        <span class="stat-label">Wins</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value" id="claude-losses">0</span>
-                        <span class="stat-label">Losses</span>
-                    </div>
-                    <div class="stat">
-                        <span class="stat-value" id="claude-draws">0</span>
-                        <span class="stat-label">Draws</span>
-                    </div>
-                </div>
-                <div class="last-move-box">
-                    <span class="last-move-label">Last Move:</span>
-                    <span id="claude-last-move" class="last-move-value">—</span>
-                </div>
-                <div class="reasoning-box">
-                    <h3>💭 Reasoning</h3>
-                    <div id="claude-reasoning" class="reasoning-text">Waiting for move...</div>
-                </div>
+            </section>
+            <div class="match-disclosures">
+                <details id="history" class="match-disclosure history-section">
+                    <summary><span id="history-title">Match history</span><span id="history-count" class="count-badge">0 matches</span><span id="overall-score" class="overall-score" aria-label="All-time matches: GPT won 0, Claude won 0, 0 tied"><span class="overall-label">All-time</span><span class="tally" title="GPT matches won"><span class="pip" data-result="gpt"></span><b id="overall-gpt" data-match-total="gpt">0</b></span><span class="tally draw-tally" title="Tied matches"><b id="overall-draw" data-match-total="tie">0</b> tied</span><span class="tally" title="Claude matches won"><b id="overall-claude" data-match-total="claude">0</b><span class="pip" data-result="claude"></span></span></span></summary>
+                    <div class="history-card"><p id="history-empty" class="history-empty">No matches yet.</p><div id="history-table-wrap" class="table-wrap hidden" tabindex="0" role="region" aria-label="All match history"><table class="stats-table"><thead><tr><th scope="col">Last round</th><th scope="col">Players</th><th scope="col">Rounds</th><th scope="col">Score</th></tr></thead><tbody id="stats-body"></tbody></table></div></div>
+                </details>
             </div>
         </div>
-    </div>
-
-    <!-- Stats Table Section -->
-    <div id="stats-section" class="stats-section hidden">
-        <h2>📊 Game History</h2>
-        <table id="stats-table" class="stats-table">
-            <thead>
-                <tr>
-                    <th>Game #</th>
-                    <th>Time</th>
-                    <th>Winner</th>
-                    <th>Turns</th>
-                    <th>GPT Time (s)</th>
-                    <th>Claude Time (s)</th>
-                </tr>
-            </thead>
-            <tbody id="stats-body">
-            </tbody>
-        </table>
-    </div>
-
-    <script src="/static/js/game.js"></script>
+    </main>
 </body>
-
 </html>
