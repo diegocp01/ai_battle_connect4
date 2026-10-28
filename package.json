@@ -1,0 +1,13 @@
+{
+  "name": "ai-battle-connect4",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local CLI adapter for the AI Connect 4 arena",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@openai/codex-sdk": "0.164.0"
+  }
+}

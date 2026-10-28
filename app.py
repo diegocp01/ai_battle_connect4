@@ -1,18 +1,25 @@
 from flask import Flask, render_template, jsonify, request
+from urllib.parse import urlparse
 import random
 from datetime import datetime
+from pathlib import Path
+import threading
+import json
 import time
+import uuid
 import os
 
-# Import the model functions
-from openai_model_v1 import call_chatgpt_move
-from anthropic_model_v1 import call_claude_move_with_thinking_flag
+from providers import MODES, ProviderError, call_local, call_test, model_catalog, select_models
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
 # Server-side game state storage
 GAME_STATE = {}
+
+# Every finished round is saved here so the setup page can show all-time stats.
+MATCH_HISTORY_PATH = Path(os.getenv('ARENA_HISTORY_PATH') or Path(__file__).resolve().parent / 'data' / 'round-history.json')
+HISTORY_LOCK = threading.Lock()
 
 # Connect 4 board configuration
 COLS = 7
@@ -140,8 +147,51 @@ def is_board_full(board):
     return all(board[0][col] != '.' for col in range(COLS))
 
 
-def init_game_state(gpt_model='gpt-5.1', claude_model='claude-haiku-4.5'):
-    """Initialize a fresh game state."""
+def read_round_history():
+    """Return every saved round, oldest first."""
+    if not MATCH_HISTORY_PATH.exists():
+        return []
+    try:
+        rounds = json.loads(MATCH_HISTORY_PATH.read_text()).get('rounds', [])
+    except (OSError, ValueError, AttributeError):
+        raise RuntimeError('Match history is damaged.')
+    return rounds if isinstance(rounds, list) else []
+
+
+def save_round(state, winner):
+    """Append a finished round to the history file. Test rounds are not saved."""
+    if state['mode'] == 'test':
+        return
+    entry = {
+        'match_id': state['match_id'],
+        'round': state['current_game'],
+        'rounds_total': state['total_games'],
+        'winner': winner,
+        'turns': state['turn_count'],
+        'mode': state['mode'],
+        'gpt_name': state['gpt_display_name'],
+        'claude_name': state['claude_display_name'],
+        'gpt_effort': state['gpt_effort'],
+        'claude_effort': state['claude_effort'],
+        'finished_at': datetime.now().strftime('%Y-%m-%d %H:%M'),
+    }
+    with HISTORY_LOCK:
+        try:
+            rounds = read_round_history()
+        except RuntimeError:
+            app.logger.warning('Round history at %s is damaged; this round was not saved.', MATCH_HISTORY_PATH)
+            return
+        MATCH_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temporary = MATCH_HISTORY_PATH.with_suffix('.tmp')
+        temporary.write_text(json.dumps({'rounds': rounds + [entry]}, indent=2) + '\n')
+        os.replace(temporary, MATCH_HISTORY_PATH)
+
+
+def init_game_state(mode='local', players=None):
+    """Initialize a fresh game state. `players` holds each side's model, effort and display name."""
+    players = players or {}
+    gpt_model = players.get('gpt_model', 'gpt-5.1')
+    claude_model = players.get('claude_model', 'claude-haiku-4.5')
     # Randomly decide who goes first
     gpt_first = random.choice([True, False])
     
@@ -166,12 +216,17 @@ def init_game_state(gpt_model='gpt-5.1', claude_model='claude-haiku-4.5'):
         'claude_last_time': 0.0,
         'last_move': None,  # (col, row) of last placed piece
         # Model settings
+        'players': players,
         'gpt_model': gpt_model,
         'claude_model': claude_model,
-        'gpt_model_id': GPT_MODELS.get(gpt_model, 'gpt-5.1'),
-        'claude_model_id': CLAUDE_MODELS.get(claude_model, 'claude-haiku-4-5-20251001'),
-        'gpt_display_name': GPT_DISPLAY_NAMES.get(gpt_model, 'GPT 5.1 Medium'),
-        'claude_display_name': CLAUDE_DISPLAY_NAMES.get(claude_model, 'Claude Haiku 4.5 Thinking'),
+        'gpt_effort': players.get('gpt_effort', 'default'),
+        'claude_effort': players.get('claude_effort', 'default'),
+        'gpt_model_id': GPT_MODELS.get(gpt_model, gpt_model),
+        'claude_model_id': CLAUDE_MODELS.get(claude_model, claude_model),
+        'gpt_display_name': players.get('gpt_name') or GPT_DISPLAY_NAMES.get(gpt_model, 'GPT'),
+        'claude_display_name': players.get('claude_name') or CLAUDE_DISPLAY_NAMES.get(claude_model, 'Claude'),
+        'mode': mode,
+        'match_id': uuid.uuid4().hex,
     }
 
 
@@ -216,23 +271,74 @@ RULES:
 Choose ONE column number (1-7) to drop your piece."""
 
 
+API_MODELS = {'gpt': (GPT_DISPLAY_NAMES, 'gpt-5.1'), 'claude': (CLAUDE_DISPLAY_NAMES, 'claude-haiku-4.5')}
+
+
+@app.before_request
+def local_requests_only():
+    # Local mode runs CLIs on this machine, so only this app's own page may post to it.
+    if request.method == 'POST' and request.headers.get('Origin'):
+        if urlparse(request.headers['Origin']).netloc != request.host:
+            return jsonify({'error': 'Use the app from its own localhost page.'}), 403
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/api/config')
+def configuration():
+    """Models each connection can use. Local models are read from the signed-in CLIs."""
+    return jsonify({'default_mode': 'local', 'models': model_catalog(API_MODELS)})
+
+
+@app.route('/api/match-history')
+def match_history():
+    """Every saved round, plus rounds won by each side."""
+    try:
+        rounds = read_round_history()
+    except RuntimeError:
+        return jsonify({'error': 'Match history is unavailable.'}), 503
+    totals = {'gpt': 0, 'claude': 0, 'draw': 0}
+    for entry in rounds:
+        if entry.get('winner') in totals:
+            totals[entry['winner']] += 1
+    response = jsonify({'rounds': rounds, 'totals': totals})
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@app.route('/api/reset', methods=['POST'])
+def reset_match():
+    """Forget the current match so the setup page starts fresh."""
+    global GAME_STATE
+    GAME_STATE = {}
+    return jsonify({'success': True})
 
 
 @app.route('/api/start-games', methods=['POST'])
 def start_games():
     """Start a new series of games."""
     global GAME_STATE
-    data = request.get_json()
-    num_games = int(data.get('num_games', 1))
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Send a JSON object with num_games and mode.'}), 400
+    try:
+        num_games = int(data.get('num_games', 1))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Number of games must be an integer.'}), 400
     num_games = max(1, min(10, num_games))
     
-    gpt_model = data.get('gpt_model', 'gpt-5.1')
-    claude_model = data.get('claude_model', 'claude-haiku-4.5')
+    mode = data.get('mode', 'local')
+    if mode not in MODES:
+        return jsonify({'error': 'Choose Local CLIs, API keys, or Test.'}), 400
+    try:
+        players = select_models(mode, data, API_MODELS)
+    except ProviderError as error:
+        return jsonify({'error': str(error)}), 400
     
-    state = init_game_state(gpt_model=gpt_model, claude_model=claude_model)
+    state = init_game_state(mode=mode, players=players)
     state['total_games'] = num_games
     GAME_STATE = state
     
@@ -246,9 +352,10 @@ def start_games():
 def get_game_state_route():
     """Get current game state."""
     global GAME_STATE
+    started = bool(GAME_STATE)
     if not GAME_STATE:
         GAME_STATE = init_game_state()
-    return jsonify(get_client_state(GAME_STATE))
+    return jsonify({**get_client_state(GAME_STATE), 'started': started})
 
 
 @app.route('/api/next-move', methods=['POST'])
@@ -263,7 +370,7 @@ def next_move():
         return jsonify({'error': 'Game is over'}), 400
     
     current_player = state['current_player']
-    state['turn_count'] += 1
+    turn = state['turn_count'] + 1
     
     # Determine piece for current player
     piece = 'R' if current_player == 'gpt' else 'Y'
@@ -278,42 +385,35 @@ def next_move():
             'game_state': get_client_state(state)
         })
     
-    # Generate prompt and call AI
-    if current_player == 'gpt':
-        player_name = "Player A (GPT - Red)"
-        prompt = generate_move_prompt(player_name, piece, state['board'], 
-                                       valid_cols, state['move_history'], state['turn_count'])
-        
-        start_time = time.time()
-        try:
+    player_name = "Player A (GPT - Red)" if current_player == 'gpt' else "Player B (Claude - Yellow)"
+    prompt = generate_move_prompt(player_name, piece, state['board'], valid_cols, state['move_history'], turn)
+    
+    # Ask the player for a column
+    start_time = time.time()
+    try:
+        if state['mode'] == 'test':
+            column, reasoning = call_test(state['board'], piece, valid_cols, drop_piece, check_winner)
+        elif state['mode'] == 'local':
+            column, reasoning = call_local(current_player, prompt, valid_cols,
+                                           state[current_player + '_model'], state[current_player + '_effort'])
+        elif current_player == 'gpt':
+            from openai_model_v1 import call_chatgpt_move
             column, reasoning = call_chatgpt_move(prompt, state['gpt_model_id'], model_key=state['gpt_model'])
-        except Exception as e:
-            return jsonify({'error': f'GPT API error: {str(e)}'}), 500
-        elapsed = time.time() - start_time
-        
-        state['gpt_reasoning'] = reasoning or 'Move selected.'
-        state['gpt_last_time'] = round(elapsed, 2)
-        state['gpt_total_time'] = round(state['gpt_total_time'] + elapsed, 2)
-    else:
-        player_name = "Player B (Claude - Yellow)"
-        prompt = generate_move_prompt(player_name, piece, state['board'], 
-                                       valid_cols, state['move_history'], state['turn_count'])
-        
-        # Determine if this model uses thinking
-        use_thinking = state['claude_model'] not in ('claude-haiku-4.5-standard', 'claude-sonnet-4.5-standard')
-        
-        start_time = time.time()
-        try:
-            column, reasoning = call_claude_move_with_thinking_flag(
-                prompt, state['claude_model_id'], use_thinking
-            )
-        except Exception as e:
-            return jsonify({'error': f'Claude API error: {str(e)}'}), 500
-        elapsed = time.time() - start_time
-        
-        state['claude_reasoning'] = reasoning or 'Move selected.'
-        state['claude_last_time'] = round(elapsed, 2)
-        state['claude_total_time'] = round(state['claude_total_time'] + elapsed, 2)
+        else:
+            from anthropic_model_v1 import call_claude_move_with_thinking_flag
+            use_thinking = state['claude_model'] not in ('claude-haiku-4.5-standard', 'claude-sonnet-4.5-standard')
+            column, reasoning = call_claude_move_with_thinking_flag(prompt, state['claude_model_id'], use_thinking)
+    except ProviderError as error:
+        return jsonify({'error': str(error)}), 502
+    except Exception as e:
+        label = 'GPT' if current_player == 'gpt' else 'Claude'
+        return jsonify({'error': f'{label} API error: {str(e)}'}), 500
+    elapsed = time.time() - start_time
+    
+    state['turn_count'] = turn
+    state[current_player + '_reasoning'] = reasoning or 'Move selected.'
+    state[current_player + '_last_time'] = round(elapsed, 2)
+    state[current_player + '_total_time'] = round(state[current_player + '_total_time'] + elapsed, 2)
     
     # Validate and execute move
     if column not in valid_cols:
@@ -346,10 +446,12 @@ def next_move():
             'game': state['current_game'],
             'time': datetime.now().strftime('%H:%M:%S'),
             'winner': winner_name,
+            'winner_model': current_player,
             'turns': state['turn_count'],
             'gpt_time': state['gpt_total_time'],
             'claude_time': state['claude_total_time']
         })
+        save_round(state, current_player)
     elif is_board_full(state['board']):
         state['game_over'] = True
         state['winner'] = 'draw'
@@ -360,10 +462,12 @@ def next_move():
             'game': state['current_game'],
             'time': datetime.now().strftime('%H:%M:%S'),
             'winner': 'Draw',
+            'winner_model': None,
             'turns': state['turn_count'],
             'gpt_time': state['gpt_total_time'],
             'claude_time': state['claude_total_time']
         })
+        save_round(state, 'draw')
     else:
         # Switch turns
         state['current_player'] = 'claude' if current_player == 'gpt' else 'gpt'
@@ -396,11 +500,10 @@ def next_game():
     history = state['game_history']
     total_games = state['total_games']
     current_game = state['current_game'] + 1
-    gpt_model = state['gpt_model']
-    claude_model = state['claude_model']
     
     # Create fresh game state
-    new_state = init_game_state(gpt_model=gpt_model, claude_model=claude_model)
+    new_state = init_game_state(mode=state['mode'], players=state['players'])
+    new_state['match_id'] = state['match_id']
     new_state['gpt_stats'] = gpt_stats
     new_state['claude_stats'] = claude_stats
     new_state['game_history'] = history
@@ -444,6 +547,11 @@ def get_client_state(state):
         
         'gpt_display_name': state.get('gpt_display_name', 'GPT 5.1 Medium'),
         'claude_display_name': state.get('claude_display_name', 'Claude Haiku 4.5 Thinking'),
+        'gpt_model': state['gpt_model'],
+        'claude_model': state['claude_model'],
+        'gpt_effort': state['gpt_effort'],
+        'claude_effort': state['claude_effort'],
+        'mode': state['mode'],
     }
 
 
