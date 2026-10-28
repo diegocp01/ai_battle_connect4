@@ -263,6 +263,8 @@ function renderScoreboard(current) {
         $(model + '-score').textContent = won[model];
         $(model + '-score').closest('.score-side').classList.toggle('is-leading', won[model] > won[model === 'gpt' ? 'claude' : 'gpt']);
     }
+    const crowned = current.all_games_complete ? seriesWinner(current) : current.game_over && current.winner !== 'draw' ? current.winner : null;
+    for (const model of Object.keys(names)) document.querySelector('.' + model + '-side').classList.toggle('has-crown', crowned === model);
     const pips = [];
     for (let round = 1; round <= current.total_games; round++) {
         const played = current.game_history.find(entry => entry.game === round);
@@ -274,6 +276,86 @@ function renderScoreboard(current) {
         pips.push(pip);
     }
     $('round-pips').replaceChildren(...pips);
+}
+
+// Whoever won more rounds, or null for a tied series.
+function seriesWinner(current) {
+    const won = {gpt: 0, claude: 0};
+    for (const round of current.game_history) if (round.winner_model) won[round.winner_model]++;
+    return won.gpt === won.claude ? null : won.gpt > won.claude ? 'gpt' : 'claude';
+}
+
+// Confetti for a win: a burst from the winner's mascot, plus cannons from both sides when they take the series.
+const confettiColors = ['#d61f29', '#f5c211', '#0071e3', '#34c759', '#ff9f0a', '#af52de'];
+let confetti = [];
+let confettiRunning = false;
+
+function celebrate(current) {
+    const winner = current.all_games_complete ? seriesWinner(current) : current.winner !== 'draw' ? current.winner : null;
+    if (!winner || document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let canvas = $('confetti');
+    if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.id = 'confetti';
+        canvas.className = 'confetti';
+        canvas.setAttribute('aria-hidden', 'true');
+        document.body.append(canvas);
+    }
+    const avatar = document.querySelector('.' + winner + '-side .avatar').getBoundingClientRect();
+    const bursts = [{x: avatar.left + avatar.width / 2, y: avatar.top + avatar.height / 2, angle: Math.PI / 2, spread: 2.6, speed: [250, 750], count: 110}];
+    if (current.all_games_complete) {
+        bursts.push({x: 0, y: innerHeight, angle: Math.PI / 3, spread: .7, speed: [900, 1500], count: 120});
+        bursts.push({x: innerWidth, y: innerHeight, angle: Math.PI * 2 / 3, spread: .7, speed: [900, 1500], count: 120});
+    }
+    for (const burst of bursts) {
+        for (let i = 0; i < burst.count; i++) {
+            const angle = burst.angle + (Math.random() - .5) * burst.spread;
+            const speed = burst.speed[0] + Math.random() * (burst.speed[1] - burst.speed[0]);
+            confetti.push({
+                x: burst.x, y: burst.y, vx: Math.cos(angle) * speed, vy: -Math.sin(angle) * speed,
+                w: 6 + Math.random() * 6, h: 3 + Math.random() * 4, rotation: Math.random() * Math.PI, spin: (Math.random() - .5) * 12,
+                flutter: Math.random() * Math.PI * 2, color: confettiColors[Math.floor(Math.random() * confettiColors.length)], age: 0,
+            });
+        }
+    }
+    if (!confettiRunning) {
+        confettiRunning = true;
+        requestAnimationFrame(time => drawConfetti(canvas, time, time));
+    }
+}
+
+// Each piece falls under gravity with air drag and flutters as it turns; the loop stops once every piece has left the screen.
+function drawConfetti(canvas, time, last) {
+    const dt = Math.min((time - last) / 1000, .05);
+    const ratio = devicePixelRatio || 1;
+    if (canvas.width !== Math.round(innerWidth * ratio) || canvas.height !== Math.round(innerHeight * ratio)) {
+        canvas.width = Math.round(innerWidth * ratio);
+        canvas.height = Math.round(innerHeight * ratio);
+    }
+    const context = canvas.getContext('2d');
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, innerWidth, innerHeight);
+    confetti = confetti.filter(piece => piece.y < innerHeight + 30 && piece.age < 6);
+    for (const piece of confetti) {
+        const drag = Math.exp(-1.6 * dt);
+        piece.vx *= drag;
+        piece.vy = piece.vy * drag + 1100 * dt;
+        piece.x += (piece.vx + Math.sin(piece.flutter) * 40) * dt;
+        piece.y += piece.vy * dt;
+        piece.rotation += piece.spin * dt;
+        piece.flutter += 9 * dt;
+        piece.age += dt;
+        context.save();
+        context.translate(piece.x, piece.y);
+        context.rotate(piece.rotation);
+        context.scale(1, Math.cos(piece.flutter));
+        context.globalAlpha = Math.min(1, 6 - piece.age);
+        context.fillStyle = piece.color;
+        context.fillRect(-piece.w / 2, -piece.h / 2, piece.w, piece.h);
+        context.restore();
+    }
+    if (confetti.length) requestAnimationFrame(next => drawConfetti(canvas, next, time));
+    else confettiRunning = false;
 }
 
 function renderMode(selected) {
@@ -452,6 +534,7 @@ async function runGameLoop() {
             const move = await request('next-move', { method: 'POST' });
             clearThinking();
             render(move.game_state);
+            if (state.game_over) celebrate(state);
             if (move.player) $(move.player + '-last-move').textContent = 'Column ' + move.column;
             if (state.game_over) loadMatchHistory();
             if (state.all_games_complete) {
