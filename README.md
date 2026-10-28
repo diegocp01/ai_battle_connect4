@@ -35,4 +35,4 @@ Run the app:
 python app.py
 ```
 
-Then open http://127.0.0.1:5001. Finished real rounds are saved to `data/round-history.json` and shown under *Universal stats* and *Match history*.
+Then open http://127.0.0.1:5001. Each match is a single game. Finished real games are saved to `data/round-history.json` and shown under *Universal stats* and *Match history*.
