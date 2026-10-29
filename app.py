@@ -238,8 +238,9 @@ def generate_move_prompt(player_name, piece, board, valid_cols, move_history, tu
     history_text = ""
     if move_history:
         recent = move_history[-10:]
-        history_lines = [f"Turn {i+1}: {'Red' if p == 'gpt' else 'Yellow'} → Column {c}" 
-                        for i, (p, c) in enumerate(recent)]
+        first_turn = len(move_history) - len(recent) + 1
+        history_lines = [f"Turn {i}: {'Red' if p == 'gpt' else 'Yellow'} → Column {c}"
+                        for i, (p, c) in enumerate(recent, start=first_turn)]
         if len(move_history) > 10:
             history_text = f"(showing last 10 of {len(move_history)} moves)\n"
         history_text += "\n".join(history_lines)
