@@ -41,12 +41,12 @@ button:focus-visible, a:focus-visible, select:focus-visible, summary:focus-visib
 .shell { max-width: 1280px; padding: 0 36px 48px; margin: auto; }
 
 /* Liquid Glass surfaces */
-.setup-connection, .rounds-pick, .player-pick, .versus, .test-badge, .start-button, .universal-stats, .arena-toolbar, .match-controls, .model-panel, .match-disclosure, .error-banner { --lg-depth: 18; --lg-blur: 2.5; background: var(--lg-tint, linear-gradient(transparent, transparent)), var(--lg-fill); -webkit-backdrop-filter: blur(20px) var(--lg-backdrop); backdrop-filter: blur(20px) var(--lg-backdrop); box-shadow: var(--lg-edge); }
+.setup-connection, .player-pick, .versus, .test-badge, .start-button, .universal-stats, .arena-toolbar, .match-controls, .model-panel, .match-disclosure, .error-banner { --lg-depth: 18; --lg-blur: 2.5; background: var(--lg-tint, linear-gradient(transparent, transparent)), var(--lg-fill); -webkit-backdrop-filter: blur(20px) var(--lg-backdrop); backdrop-filter: blur(20px) var(--lg-backdrop); box-shadow: var(--lg-edge); }
 .versus, .test-badge, .start-button { --lg-depth: 12; --lg-blur: 1; }
 .arena-toolbar, .match-controls { --lg-depth: 14; --lg-blur: 1.5; }
 .board { --lg-blur: 1.5; }
-.setup-connection, .rounds-pick, .player-pick, .test-badge, .start-button, .universal-stats, .model-panel, .error-banner { position: relative; }
-.setup-connection::after, .rounds-pick::after, .player-pick::after, .versus::after, .test-badge::after, .start-button::after, .universal-stats::after, .arena-toolbar::after, .match-controls::after, .model-panel::after, .error-banner::after { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none; background: var(--lg-rim); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.setup-connection, .player-pick, .test-badge, .start-button, .universal-stats, .model-panel, .error-banner { position: relative; }
+.setup-connection::after, .player-pick::after, .versus::after, .test-badge::after, .start-button::after, .universal-stats::after, .arena-toolbar::after, .match-controls::after, .model-panel::after, .error-banner::after { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none; background: var(--lg-rim); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
 
 /* Controls on glass */
 select { width: 100%; min-width: 0; min-height: 44px; appearance: none; color: var(--ink); border: 0; border-radius: 980px; background: var(--chevron) no-repeat right 15px center, var(--fill); box-shadow: var(--fill-edge); padding: 11px 40px 11px 17px; font-size: 15px; font-weight: 500; text-overflow: ellipsis; cursor: pointer; transition: transform .45s var(--spring), box-shadow .25s; }
@@ -78,14 +78,11 @@ select:active:not(:disabled) { transform: scale(1.03); }
 .setup h1:focus, .arena:focus { outline: none; }
 .test-badge { display: inline-block; border-radius: 980px; padding: 7px 14px; color: #0066cc; --lg-tint: linear-gradient(rgb(0 113 227 / 10%), rgb(0 113 227 / 10%)); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .setup label { display: block; font-size: 15px; font-weight: 600; margin-bottom: 8px; }
-.setup-connection, .rounds-pick { padding: 16px 16px 16px 24px; border-radius: 28px; }
+.setup-connection { padding: 16px 16px 16px 24px; border-radius: 28px; }
 .setup-connection { display: grid; grid-template-columns: 1fr 210px; grid-template-areas: "label select" "desc select"; align-items: center; gap: 2px 24px; }
 .setup-connection label { grid-area: label; margin: 0; }
 .setup-connection select { grid-area: select; }
 .setup-connection p { grid-area: desc; font-size: 13px; color: var(--muted); margin: 0; }
-.rounds-pick { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-.rounds-pick label { margin: 0; }
-.rounds-pick select { width: 120px; }
 .player-picks { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .player-pick { --player: var(--gpt); --lg-tint: radial-gradient(120% 60% at 0% 0%, color-mix(in srgb, var(--player) 18%, transparent), transparent 70%); margin: 0; padding: 22px; min-width: 0; border: 0; border-radius: 30px; }
 .claude-pick { --player: var(--claude); }
@@ -121,7 +118,7 @@ select:active:not(:disabled) { transform: scale(1.03); }
 .start-button:disabled { box-shadow: none; }
 .start-button::after { content: none !important; }
 .start-button svg { width: 16px; height: 16px; }
-/* Universal stats: every saved real round across all matches, by logo. */
+/* Universal stats: every saved real game, by logo. */
 .universal-stats { margin-top: 16px; padding: 18px 24px 22px; border-radius: 28px; }
 .universal-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .universal-heading h2 { margin: 0; font-size: 17px; font-weight: 600; }
@@ -135,10 +132,9 @@ select:active:not(:disabled) { transform: scale(1.03); }
 .universal-stats .pip::before { inset: 11px; }
 .universal-draws { text-align: center; }
 .universal-draws b { font-size: 24px; color: var(--muted); }
-.universal-rounds { margin: 14px 0 0; text-align: center; font-size: 12px; font-weight: 500; letter-spacing: .02em; color: var(--muted); }
-/* Every saved match, newest first: winner, players at their effort, a logo marker per round, score. */
+/* Every saved game, newest first: winner, then players at their effort. */
 .universal-matches { list-style: none; display: grid; gap: 8px; max-height: 320px; overflow: auto; margin: 16px 0 0; padding: 0; scrollbar-width: thin; }
-.universal-match { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 9px 14px 9px 9px; border-radius: 18px; background: rgb(0 0 0 / 3%); box-shadow: inset 0 0 0 .5px rgb(0 0 0 / 5%); }
+.universal-match { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 9px 14px 9px 9px; border-radius: 18px; background: rgb(0 0 0 / 3%); box-shadow: inset 0 0 0 .5px rgb(0 0 0 / 5%); }
 .match-badge { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; font-size: 11px; font-weight: 700; color: var(--muted); background: rgb(0 0 0 / 5%); box-shadow: inset 0 0 0 1px rgb(0 0 0 / 8%); }
 .match-badge[data-winner="gpt"], .match-badge[data-winner="claude"] { background: none; box-shadow: none; }
 .universal-match .match-badge .pip { width: 34px; height: 34px; }
@@ -146,10 +142,6 @@ select:active:not(:disabled) { transform: scale(1.03); }
 .match-players { min-width: 0; }
 .universal-stats .match-players b { font-size: 13px; line-height: 1.3; font-weight: 600; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .universal-stats .match-players small { margin-top: 2px; font-size: 11px; }
-.universal-match .round-pips { gap: 4px; }
-.universal-match .pip { width: 20px; height: 20px; }
-.universal-match .round-pips .pip::before { inset: 3px; }
-.match-score { min-width: 34px; text-align: right; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* Match */
 .match-view { position: relative; max-width: 1208px; margin: 18px auto 0; }
@@ -169,12 +161,7 @@ select:active:not(:disabled) { transform: scale(1.03); }
 /* The player whose move it is: their mascot glows in their color and bobs while thinking. */
 .arena:has(#gpt-panel.is-thinking) .gpt-side .mascot, .arena:has(#claude-panel.is-thinking) .claude-side .mascot { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--mark-color) 70%, transparent)) drop-shadow(0 4px 6px rgb(0 0 0 / 20%)); animation: mascot-think .9s ease-in-out infinite alternate; }
 @keyframes mascot-think { to { transform: translateY(-3px) rotate(-3deg); } }
-.score-value { font-size: 30px; line-height: 1; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; transition: color .3s; }
-.is-leading .score-value { color: var(--side); }
-.score-center { display: grid; justify-items: center; gap: 7px; }
-.game-counter { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
-.game-counter b { color: var(--ink); font-weight: 700; }
-.round-pips { display: flex; align-items: center; gap: 6px; }
+.score-center { font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 /* Each round slot shows the logo of whoever won it (ChatGPT or Claude); draws get a dash, unplayed rounds an empty ring. */
 .pip { position: relative; width: 24px; height: 24px; border-radius: 50%; background: rgb(0 0 0 / 5%); box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%), inset 0 1px 2px rgb(0 0 0 / 8%); }
 .pip[data-result="gpt"], .pip[data-result="claude"] { background: #fff; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--won) 55%, transparent), 0 2px 8px -2px color-mix(in srgb, var(--won) 60%, transparent); }
@@ -192,7 +179,7 @@ select:active:not(:disabled) { transform: scale(1.03); }
 .avatar { position: relative; flex: none; display: grid; place-items: center; width: 46px; height: 46px; }
 .mascot { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 4px 6px rgb(0 0 0 / 20%)); }
 .avatar .mark { position: absolute; right: -6px; bottom: -4px; width: 22px; height: 22px; }
-/* The winner wears a crown: the round's winner while its result shows, the series winner once the match ends. */
+/* The winner wears a crown once the game ends. */
 .crown { --tilt: -10deg; position: absolute; left: 50%; top: -17px; z-index: 1; width: 32px; height: auto; opacity: 0; transform: translateX(-50%) translateY(-12px) rotate(var(--tilt)) scale(.4); transform-origin: 50% 100%; filter: drop-shadow(0 2px 3px rgb(0 0 0 / 25%)); pointer-events: none; transition: transform .5s cubic-bezier(.34, 1.56, .64, 1), opacity .2s; }
 .claude-side .crown { --tilt: 10deg; }
 .has-crown .crown { opacity: 1; transform: translateX(-50%) rotate(var(--tilt)); animation: crown-shine 2.4s ease-in-out .5s infinite; }
@@ -236,8 +223,6 @@ select:active:not(:disabled) { transform: scale(1.03); }
 .status-dot.paused { background: #ff9f0a; }
 .status-dot.complete { background: var(--blue); }
 .status-dot.error { background: #ff453a; }
-#series-progress-text { width: 100%; }
-.series-details progress { width: 100%; height: 6px; accent-color: var(--blue); }
 .match-rules { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 12px 0 16px; }
 
 /* Board: a blue plastic Connect 4 frame seen straight on. board3d.js draws it in WebGL over this stage;
@@ -330,7 +315,7 @@ select:active:not(:disabled) { transform: scale(1.03); }
     .setup h1 { font-size: 32px; }
     .setup-eyebrow { font-size: 13px; }
     .test-badge { font-size: 11px; padding: 5px 10px; }
-    .setup-connection, .rounds-pick { padding: 14px 14px 14px 18px; border-radius: 24px; }
+    .setup-connection { padding: 14px 14px 14px 18px; border-radius: 24px; }
     .setup-connection { grid-template-columns: 1fr 150px; gap: 2px 14px; }
     .player-picks { grid-template-columns: 1fr; gap: 16px; }
     .versus { position: relative; left: auto; top: auto; translate: none; justify-self: center; margin: -25px 0; }
@@ -340,20 +325,15 @@ select:active:not(:disabled) { transform: scale(1.03); }
     .universal-stats .pip { width: 40px; height: 40px; }
     .universal-stats .pip::before { inset: 8px; }
     .universal-side { gap: 10px; }
-    .universal-match { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 6px; }
-    .universal-match .round-pips { grid-column: 2 / -1; grid-row: 2; }
     .arena-toolbar { padding: 6px 18px; gap: 10px; min-height: 56px; }
     .score-side { gap: 8px; }
-    .arena-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-areas: "gpt claude" "center center"; gap: 6px 10px; padding: 10px 14px 8px; border-radius: 30px; }
+    .arena-toolbar { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: "gpt center claude"; gap: 8px; padding: 10px 14px; border-radius: 30px; }
     .gpt-side { grid-area: gpt; }
     .claude-side { grid-area: claude; }
-    .score-center { grid-area: center; grid-template-columns: auto auto; justify-content: center; align-items: center; gap: 10px; }
+    .score-center { grid-area: center; font-size: 11px; }
     .score-side .avatar { width: 40px; height: 40px; margin: -4px 0; }
     .avatar .mark { width: 18px; height: 18px; }
     .score-side h2 { font-size: 13px; }
-    .score-value { font-size: 22px; }
-    .game-counter { font-size: 10px; letter-spacing: .05em; }
-    .round-pips { gap: 4px; }
     .pip { width: 18px; height: 18px; }
     .pip[data-result="gpt"]::before, .pip[data-result="claude"]::before { inset: 3px; }
     .match-controls .button { min-height: 40px; padding: 8px 14px; font-size: 13px; }
@@ -374,10 +354,10 @@ select:active:not(:disabled) { transform: scale(1.03); }
 }
 @media (prefers-reduced-transparency: reduce) {
     :root { --lg-fill: linear-gradient(#fff, #fff); --fill: linear-gradient(#ececf0, #ececf0); }
-    .setup-connection, .rounds-pick, .player-pick, .versus, .test-badge, .start-button, .universal-stats, .arena-toolbar, .match-controls, .model-panel, .model-info, .match-disclosure, .error-banner { -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .setup-connection, .player-pick, .versus, .test-badge, .start-button, .universal-stats, .arena-toolbar, .match-controls, .model-panel, .model-info, .match-disclosure, .error-banner { -webkit-backdrop-filter: none; backdrop-filter: none; }
     .board { background: #2a2a2e; }
 }
 @media (prefers-contrast: more) {
-    select, .secondary, .versus, .arena-toolbar, .setup-connection, .rounds-pick, .player-pick, .model-panel, .match-disclosure { outline: 1px solid rgb(0 0 0 / 55%); outline-offset: -1px; }
+    select, .secondary, .versus, .arena-toolbar, .setup-connection, .player-pick, .model-panel, .match-disclosure { outline: 1px solid rgb(0 0 0 / 55%); outline-offset: -1px; }
     :root { --muted: #48484d; }
 }

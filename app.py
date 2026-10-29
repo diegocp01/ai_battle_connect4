@@ -319,17 +319,11 @@ def reset_match():
 
 @app.route('/api/start-games', methods=['POST'])
 def start_games():
-    """Start a new series of games."""
+    """Start a new game."""
     global GAME_STATE
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return jsonify({'error': 'Send a JSON object with num_games and mode.'}), 400
-    try:
-        num_games = int(data.get('num_games', 1))
-    except (TypeError, ValueError):
-        return jsonify({'error': 'Number of games must be an integer.'}), 400
-    num_games = max(1, min(10, num_games))
-    
+        return jsonify({'error': 'Send a JSON object with mode and models.'}), 400
     mode = data.get('mode', 'local')
     if mode not in MODES:
         return jsonify({'error': 'Choose Local CLIs, API keys, or Test.'}), 400
@@ -339,7 +333,6 @@ def start_games():
         return jsonify({'error': str(error)}), 400
     
     state = init_game_state(mode=mode, players=players)
-    state['total_games'] = num_games
     GAME_STATE = state
     
     return jsonify({
@@ -480,41 +473,6 @@ def next_move():
         'column': column,
         'row': row,
         'game_state': get_client_state(state)
-    })
-
-
-@app.route('/api/next-game', methods=['POST'])
-def next_game():
-    """Start the next game in the series."""
-    global GAME_STATE
-    state = GAME_STATE
-    if not state:
-        return jsonify({'error': 'No game in progress'}), 400
-    
-    if state['current_game'] >= state['total_games']:
-        return jsonify({'error': 'All games completed'}), 400
-    
-    # Preserve stats, history, and model settings
-    gpt_stats = state['gpt_stats']
-    claude_stats = state['claude_stats']
-    history = state['game_history']
-    total_games = state['total_games']
-    current_game = state['current_game'] + 1
-    
-    # Create fresh game state
-    new_state = init_game_state(mode=state['mode'], players=state['players'])
-    new_state['match_id'] = state['match_id']
-    new_state['gpt_stats'] = gpt_stats
-    new_state['claude_stats'] = claude_stats
-    new_state['game_history'] = history
-    new_state['total_games'] = total_games
-    new_state['current_game'] = current_game
-    
-    GAME_STATE = new_state
-    
-    return jsonify({
-        'success': True,
-        'game_state': get_client_state(new_state)
     })
 
 

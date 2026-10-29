@@ -27,7 +27,6 @@ function setMode(next) {
     mode = next;
     const active = ['running', 'pausing'].includes(mode);
     const loading = ['loading', 'starting'].includes(mode);
-    $('game-count').disabled = active || loading;
     $('play-mode').disabled = active || loading;
     for (const key of Object.keys(names)) {
         $(key + '-model').disabled = active || loading || !$(key + '-model').value;
@@ -41,7 +40,7 @@ function setMode(next) {
     $('btn-resume').classList.toggle('hidden', !(state && ['paused', 'error'].includes(mode)));
     $('btn-resume').textContent = mode === 'error' ? 'Retry move' : 'Resume match';
     $('btn-new').disabled = active || loading;
-    $('session-title').textContent = ({loading: 'Loading', idle: 'Ready', starting: 'Starting', running: 'Match in progress', pausing: 'Finishing turn', paused: 'Match paused', error: 'Match interrupted', complete: 'Series complete'})[mode];
+    $('session-title').textContent = ({loading: 'Loading', idle: 'Ready', starting: 'Starting', running: 'Match in progress', pausing: 'Finishing turn', paused: 'Match paused', error: 'Match interrupted', complete: 'Game over'})[mode];
     $('session-indicator').className = 'status-dot ' + mode;
 }
 
@@ -125,7 +124,6 @@ function populateModels(selectedMode, preferred = {}) {
 function rememberSettings() {
     const selected = $('play-mode').value;
     preferences.mode = selected;
-    preferences.num_games = Number($('game-count').value);
     preferences.models = preferences.models || {};
     preferences.models[selected] = {gpt_model: $('gpt-model').value, claude_model: $('claude-model').value, gpt_effort: readEffort('gpt'), claude_effort: readEffort('claude')};
     try { localStorage.setItem(settingsKey, JSON.stringify(preferences)); } catch {}
@@ -255,43 +253,19 @@ function renderBoard(current, animate) {
     }
 }
 
-// Fighting-game style scoreboard: each side's rounds won, plus one marker per round showing who took it.
+// The winner wears the crown once the game ends.
 function renderScoreboard(current) {
-    const won = {gpt: 0, claude: 0};
-    for (const round of current.game_history) if (round.winner_model) won[round.winner_model]++;
-    for (const model of Object.keys(names)) {
-        $(model + '-score').textContent = won[model];
-        $(model + '-score').closest('.score-side').classList.toggle('is-leading', won[model] > won[model === 'gpt' ? 'claude' : 'gpt']);
-    }
-    const crowned = current.all_games_complete ? seriesWinner(current) : current.game_over && current.winner !== 'draw' ? current.winner : null;
+    const crowned = current.game_over && current.winner !== 'draw' ? current.winner : null;
     for (const model of Object.keys(names)) document.querySelector('.' + model + '-side').classList.toggle('has-crown', crowned === model);
-    const pips = [];
-    for (let round = 1; round <= current.total_games; round++) {
-        const played = current.game_history.find(entry => entry.game === round);
-        const result = played ? played.winner_model || 'draw' : round === current.current_game && !current.all_games_complete ? 'current' : 'pending';
-        const pip = document.createElement('span');
-        pip.className = 'pip';
-        pip.dataset.result = result;
-        pip.title = 'Round ' + round + ': ' + ({gpt: names.gpt + ' won', claude: names.claude + ' won', draw: 'Draw', current: 'In play', pending: 'Not played'})[result];
-        pips.push(pip);
-    }
-    $('round-pips').replaceChildren(...pips);
 }
 
-// Whoever won more rounds, or null for a tied series.
-function seriesWinner(current) {
-    const won = {gpt: 0, claude: 0};
-    for (const round of current.game_history) if (round.winner_model) won[round.winner_model]++;
-    return won.gpt === won.claude ? null : won.gpt > won.claude ? 'gpt' : 'claude';
-}
-
-// Confetti for a win: a burst from the winner's mascot, plus cannons from both sides when they take the series.
+// Confetti for a win: a burst from the winner's mascot and cannons from both bottom corners.
 const confettiColors = ['#d61f29', '#f5c211', '#0071e3', '#34c759', '#ff9f0a', '#af52de'];
 let confetti = [];
 let confettiRunning = false;
 
 function celebrate(current) {
-    const winner = current.all_games_complete ? seriesWinner(current) : current.winner !== 'draw' ? current.winner : null;
+    const winner = current.winner !== 'draw' ? current.winner : null;
     if (!winner || document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     let canvas = $('confetti');
     if (!canvas) {
@@ -302,11 +276,11 @@ function celebrate(current) {
         document.body.append(canvas);
     }
     const avatar = document.querySelector('.' + winner + '-side .avatar').getBoundingClientRect();
-    const bursts = [{x: avatar.left + avatar.width / 2, y: avatar.top + avatar.height / 2, angle: Math.PI / 2, spread: 2.6, speed: [250, 750], count: 110}];
-    if (current.all_games_complete) {
-        bursts.push({x: 0, y: innerHeight, angle: Math.PI / 3, spread: .7, speed: [900, 1500], count: 120});
-        bursts.push({x: innerWidth, y: innerHeight, angle: Math.PI * 2 / 3, spread: .7, speed: [900, 1500], count: 120});
-    }
+    const bursts = [
+        {x: avatar.left + avatar.width / 2, y: avatar.top + avatar.height / 2, angle: Math.PI / 2, spread: 2.6, speed: [250, 750], count: 110},
+        {x: 0, y: innerHeight, angle: Math.PI / 3, spread: .7, speed: [900, 1500], count: 120},
+        {x: innerWidth, y: innerHeight, angle: Math.PI * 2 / 3, spread: .7, speed: [900, 1500], count: 120},
+    ];
     for (const burst of bursts) {
         for (let i = 0; i < burst.count; i++) {
             const angle = burst.angle + (Math.random() - .5) * burst.spread;
@@ -370,8 +344,6 @@ function render(current) {
     names.gpt = current.gpt_display_name;
     names.claude = current.claude_display_name;
     renderedGame = current.current_game;
-    $('game-number').textContent = current.current_game;
-    $('total-games').textContent = current.total_games;
     renderScoreboard(current);
     renderBoard(current, !changedGame);
     for (const model of Object.keys(names)) {
@@ -381,7 +353,6 @@ function render(current) {
         const effort = current[model + '_effort'] || 'default';
         $(model + '-effort-detail').textContent = current.mode === 'test' ? 'Not used' : current.mode === 'api' ? 'Set by model' : effortLabels[effort] || effort;
         $(model + '-stats').setAttribute('aria-label', names[model] + ' results');
-        $(model + '-score').setAttribute('aria-label', names[model] + ' rounds won');
         for (const result of ['wins', 'losses', 'draws']) {
             $(model + '-' + result).textContent = current[model + '_stats'][result] || 0;
         }
@@ -391,12 +362,7 @@ function render(current) {
         $(model + '-idle').textContent = current.game_over ? 'Game finished' : current.current_player === model ? 'Up next' : 'Waiting for its turn';
         if (changedGame) $(model + '-last-move').textContent = '—';
     }
-    $('series-progress').max = current.total_games;
-    $('series-progress').value = current.game_history.length;
-    $('series-progress-text').textContent = current.game_history.length + ' of ' + current.total_games + ' rounds complete';
-    if (current.game_over) {
-        setStatus(current.winner === 'draw' ? 'Draw.' : names[current.winner] + ' wins.', current.all_games_complete ? '' : 'Next round starting…');
-    }
+    if (current.game_over) setStatus(current.winner === 'draw' ? 'Draw.' : names[current.winner] + ' wins.', '');
 }
 
 async function loadMatchHistory() {
@@ -414,86 +380,56 @@ function playerLabel(name, effort) {
     return effort && effort !== 'default' ? `${name} · ${effortLabels[effort] || effort}` : name;
 }
 
-// Saved rounds grouped back into their matches. A match is decided by rounds won; it only counts once all its rounds are saved.
-function summarizeMatches(rounds) {
-    const matches = new Map();
-    for (const entry of rounds) {
-        const match = matches.get(entry.match_id) || {rounds: [], total: entry.rounds_total,
-            players: [playerLabel(entry.gpt_name, entry.gpt_effort), playerLabel(entry.claude_name, entry.claude_effort)]};
-        match.rounds.push(entry);
-        matches.set(entry.match_id, match);
-    }
-    return [...matches.values()].map(match => {
-        const won = {gpt: 0, claude: 0, draw: 0};
-        for (const entry of match.rounds) if (entry.winner in won) won[entry.winner]++;
-        const winner = match.rounds.length < (match.total || 0) ? 'unfinished' : won.gpt === won.claude ? 'tie' : won.gpt > won.claude ? 'gpt' : 'claude';
-        return {...match, won, winner, finished: match.rounds.at(-1).finished_at || '—'};
-    });
+function gamePlayers(game) {
+    return [playerLabel(game.gpt_name, game.gpt_effort), playerLabel(game.claude_name, game.claude_effort)].filter(Boolean).join(' vs ') || '—';
 }
 
-function roundPips(match) {
-    const pips = document.createElement('span');
-    pips.className = 'round-pips';
-    for (let round = 1; round <= Math.max(match.total || 0, match.rounds.length); round++) {
-        const pip = document.createElement('span');
-        pip.className = 'pip';
-        pip.dataset.result = match.rounds.find(entry => entry.round === round)?.winner || 'pending';
-        pips.appendChild(pip);
-    }
-    return pips;
+function gameResult(game) {
+    return game.winner === 'gpt' ? (game.gpt_name || 'GPT') + ' won' : game.winner === 'claude' ? (game.claude_name || 'Claude') + ' won' : 'Draw';
 }
 
-// One row per match on the setup page: who won it, the players, a marker per round, and the score.
-function renderUniversalMatches(matches) {
-    const rows = [...matches].reverse().map(match => {
+// One row per saved game on the setup page: who won it, the players at their effort, and when it finished.
+function renderUniversalGames(games) {
+    const rows = [...games].reverse().map(game => {
         const row = document.createElement('li');
         row.className = 'universal-match';
         const badge = document.createElement('span');
         badge.className = 'match-badge';
-        badge.dataset.winner = match.winner;
-        if (match.winner === 'gpt' || match.winner === 'claude') {
+        badge.dataset.winner = game.winner;
+        if (game.winner === 'gpt' || game.winner === 'claude') {
             const pip = document.createElement('span');
             pip.className = 'pip';
-            pip.dataset.result = match.winner;
+            pip.dataset.result = game.winner;
             badge.appendChild(pip);
-        } else badge.textContent = match.winner === 'tie' ? 'Tie' : '…';
-        badge.title = ({gpt: 'GPT won the match', claude: 'Claude won the match', tie: 'Tied match', unfinished: 'Unfinished match'})[match.winner];
+        } else badge.textContent = 'Draw';
+        badge.title = gameResult(game);
         const info = document.createElement('span');
         info.className = 'match-players';
         const players = document.createElement('b');
-        players.textContent = match.players.filter(Boolean).join(' vs ');
+        players.textContent = gamePlayers(game);
         const when = document.createElement('small');
-        when.textContent = `${match.finished} · ${match.rounds.length} of ${match.total ?? '—'} rounds`;
+        when.textContent = [game.finished_at || '—', game.turns ? game.turns + ' moves' : ''].filter(Boolean).join(' · ');
         info.append(players, when);
-        const score = document.createElement('span');
-        score.className = 'match-score';
-        score.textContent = `${match.won.gpt}–${match.won.claude}`;
-        row.append(badge, info, roundPips(match), score);
+        row.append(badge, info);
         return row;
     });
     $('universal-matches').replaceChildren(...rows);
     $('universal-matches').classList.toggle('hidden', rows.length === 0);
 }
 
-function renderHistory(rounds, totals = {gpt: 0, claude: 0, draw: 0}) {
-    const matches = summarizeMatches(rounds);
-    const decided = {gpt: 0, claude: 0, tie: 0};
-    for (const match of matches) if (match.winner in decided) decided[match.winner]++;
-    $('history-empty').textContent = 'No matches yet.';
-    $('history-empty').classList.toggle('hidden', matches.length > 0);
-    $('history-table-wrap').classList.toggle('hidden', matches.length === 0);
-    $('history-count').textContent = matches.length + (matches.length === 1 ? ' match' : ' matches');
-    for (const element of document.querySelectorAll('[data-match-total]')) element.textContent = decided[element.dataset.matchTotal];
-    $('universal-meta').textContent = `${$('history-count').textContent} · ${rounds.length} ${rounds.length === 1 ? 'round' : 'rounds'}`;
-    $('universal-rounds').textContent = `Rounds · GPT ${totals.gpt || 0} · Draws ${totals.draw || 0} · Claude ${totals.claude || 0}`;
-    $('overall-score').setAttribute('aria-label', `All-time matches: GPT won ${decided.gpt}, Claude won ${decided.claude}, ${decided.tie} tied`);
-    renderUniversalMatches(matches);
+function renderHistory(games, totals = {gpt: 0, claude: 0, draw: 0}) {
+    $('history-empty').textContent = 'No games yet.';
+    $('history-empty').classList.toggle('hidden', games.length > 0);
+    $('history-table-wrap').classList.toggle('hidden', games.length === 0);
+    $('history-count').textContent = games.length + (games.length === 1 ? ' game' : ' games');
+    for (const element of document.querySelectorAll('[data-match-total]')) element.textContent = totals[element.dataset.matchTotal] || 0;
+    $('universal-meta').textContent = $('history-count').textContent;
+    $('overall-score').setAttribute('aria-label', `All-time games: GPT won ${totals.gpt || 0}, Claude won ${totals.claude || 0}, ${totals.draw || 0} draws`);
+    renderUniversalGames(games);
     $('stats-body').replaceChildren();
-    for (const match of [...matches].reverse()) {
+    for (const game of [...games].reverse()) {
         const row = document.createElement('tr');
-        const score = match.won.gpt + '–' + match.won.claude + (match.won.draw ? ` · ${match.won.draw} draw${match.won.draw === 1 ? '' : 's'}` : '');
-        const values = [match.finished, match.players.filter(Boolean).join(' vs ') || '—', match.rounds.length + ' of ' + (match.total ?? '—'), score];
-        for (const value of values) {
+        for (const value of [game.finished_at || '—', gamePlayers(game), gameResult(game)]) {
             const cell = document.createElement('td');
             cell.textContent = value;
             row.appendChild(cell);
@@ -502,12 +438,9 @@ function renderHistory(rounds, totals = {gpt: 0, claude: 0, draw: 0}) {
     }
 }
 
-function finishSeries() {
+function finishGame() {
     setMode('complete');
-    const gptWins = state.gpt_stats.wins;
-    const claudeWins = state.claude_stats.wins;
-    const result = gptWins === claudeWins ? 'Series tied.' : names[gptWins > claudeWins ? 'gpt' : 'claude'] + ' wins the series.';
-    setStatus(result, '');
+    setStatus(state.winner === 'draw' ? 'Draw.' : names[state.winner] + ' wins.', '');
 }
 
 async function runGameLoop() {
@@ -518,30 +451,23 @@ async function runGameLoop() {
         while (mode === 'running') {
             const current = await request('game-state');
             render(current);
-            if (current.all_games_complete) {
-                finishSeries();
+            if (current.game_over) {
+                finishGame();
                 break;
             }
             if (mode !== 'running') break;
-            if (current.game_over) {
-                await sleep(state.mode === 'test' ? 900 : 2400);
-                if (mode !== 'running') break;
-                const next = await request('next-game', { method: 'POST' });
-                render(next.game_state);
-                continue;
-            }
             showThinking(current.current_player);
             const move = await request('next-move', { method: 'POST' });
             clearThinking();
             render(move.game_state);
             if (state.game_over) celebrate(state);
             if (move.player) $(move.player + '-last-move').textContent = 'Column ' + move.column;
-            if (state.game_over) loadMatchHistory();
-            if (state.all_games_complete) {
-                finishSeries();
+            if (state.game_over) {
+                loadMatchHistory();
+                finishGame();
                 break;
             }
-            if (!state.game_over) setStatus(names[move.player] + ' played column ' + move.column + '.', '');
+            setStatus(names[move.player] + ' played column ' + move.column + '.', '');
             if (mode !== 'running') break;
             await sleep(state.mode === 'test' ? 450 : 1000);
         }
@@ -566,7 +492,7 @@ async function startGames(event) {
         return;
     }
     const settings = {
-        num_games: Number($('game-count').value), mode: $('play-mode').value,
+        mode: $('play-mode').value,
         gpt_model: $('gpt-model').value, claude_model: $('claude-model').value,
         gpt_effort: readEffort('gpt'), claude_effort: readEffort('claude'),
     };
@@ -625,16 +551,13 @@ async function restoreSession() {
         const selected = configuration.models[preferences.mode] ? preferences.mode : configuration.default_mode;
         renderMode(selected);
         populateModels(selected);
-        const rounds = Number(preferences.num_games);
-        if (Number.isInteger(rounds) && rounds >= 1 && rounds <= 10) $('game-count').value = rounds;
         const saved = await request('game-state');
         if (saved.started) {
-            $('game-count').value = saved.total_games;
             renderMode(saved.mode);
             populateModels(saved.mode, saved);
             render(saved);
             showMatch();
-            if (saved.all_games_complete) finishSeries();
+            if (saved.game_over) finishGame();
             else {
                 setMode('paused');
                 setStatus('Match paused.', '');
