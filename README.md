@@ -2,7 +2,14 @@
 
 This is a Connect 4 game where GPT plays against Claude on a 3D board: GPT drops the red checkers and Claude the yellow ones.
 
-![Connect 4 Demo](static/img/image.png?v=2)
+![GPT and Claude mid-game on the 3D Connect 4 board](static/img/image.webp)
+
+# What's new
+
+- **3D board and new interface** ([#1](https://github.com/diegocp01/ai_battle_connect4/pull/1)): a three.js board with checkers that drop and bounce, a scoreboard, and panels showing each player's settings, latest explanation and timing. A crown and confetti mark the winner. Browsers without WebGL get a flat board.
+- **Local CLI players** ([#1](https://github.com/diegocp01/ai_battle_connect4/pull/1)): play through your signed-in Codex and Claude Code CLIs without API keys, or use the Test connection to try the interface.
+- **Single-game matches** ([#2](https://github.com/diegocp01/ai_battle_connect4/pull/2)): every match is now one game, and the win, draw and match history views list each saved game.
+- **Correct move numbers** ([#3](https://github.com/diegocp01/ai_battle_connect4/pull/3)): the recent moves in the prompt now show their real turn numbers, even after move 10.
 
 # Connections
 
